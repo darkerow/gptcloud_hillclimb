@@ -1,0 +1,26 @@
+name: Prepare local review bundle
+on:
+  push:
+    branches: [feature/arcade-art-suspension]
+    paths: [.github/workflows/review-bundle.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: tar -czf /tmp/local-review.tar.gz src tests docs index.html package.json package-lock.json vite.config.js README.md node_modules
+      - uses: actions/upload-artifact@v4
+        with:
+          name: local-review-bundle
+          path: /tmp/local-review.tar.gz
+          retention-days: 1
