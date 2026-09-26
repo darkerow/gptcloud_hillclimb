@@ -82,12 +82,13 @@ export class TrackWorld {
     return got;
   }
   drawSky(){drawSkyArt(this);}
-  draw(){
-    this.drawSky();this.events.draw();const g=this.deck;g.clear();const c=this.scene.cameras.main,min=c.scrollX-300,max=c.scrollX+c.width+300;
+  draw(sample=body=>body){
+    this.drawSky();this.events.draw(sample);const g=this.deck;g.clear();const c=this.scene.cameras.main,min=c.scrollX-300,max=c.scrollX+c.width+300;
     for(const b of this.bridges){if(b.end<min||b.start>max)continue;
       for(const x of [b.start-10,b.end+10])g.fillStyle(0x594532).fillRoundedRect(x-6,b.y-88,12,110,3);
-      g.lineStyle(4,0x685140).beginPath().moveTo(b.start-10,b.y-76);for(const p of b.planks)g.lineTo(p.position.x,p.position.y-62);g.lineTo(b.end+10,b.y-76).strokePath();
-      b.planks.forEach((p,i)=>{
+      g.lineStyle(4,0x685140).beginPath().moveTo(b.start-10,b.y-76);for(const plank of b.planks){const p=sample(plank);g.lineTo(p.position.x,p.position.y-62);}g.lineTo(b.end+10,b.y-76).strokePath();
+      b.planks.forEach((plank,i)=>{
+        const p=sample(plank);
         if(i%2===0)g.lineStyle(2,0x97744c).lineBetween(p.position.x,p.position.y-62,p.position.x,p.position.y-7);
         const co=Math.cos(p.angle),si=Math.sin(p.angle);g.fillStyle(i%2?0xbd844c:0xd49a5a).lineStyle(1.5,0x694526).beginPath();
         [[-b.step/2,-7],[b.step/2,-7],[b.step/2,7],[-b.step/2,7]].forEach(([x,y],n)=>{const xx=p.position.x+x*co-y*si,yy=p.position.y+x*si+y*co;n?g.lineTo(xx,yy):g.moveTo(xx,yy);});g.closePath().fillPath().strokePath();

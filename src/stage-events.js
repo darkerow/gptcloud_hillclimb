@@ -58,7 +58,7 @@ export class StageEvents {
   this.dust=this.dust.filter(p=>p.life<p.max).slice(-60);
   this.hint=Math.abs(this.gust)>.55?'ПОРЫВ ВЕТРА '+(this.gust>0?'→':'←'):{ice:'СКОЛЬЗКИЙ ЛЁД',water:'БРОД',mud:'ВЯЗКАЯ ГРЯЗЬ',sand:'РЫХЛЫЙ ПЕСОК',pad:'РАЗГОННАЯ ПОЛОСА'}[zone]||'';
  }
- draw(){
+ draw(sample=body=>body){
   const g=this.g;g.clear();const c=this.scene.cameras.main,from=c.scrollX-100,to=c.scrollX+c.width+100;
   for(let x=Math.floor((from-2300)/2600)*2600+2300;x<to+400;x+=2600){if(x<1700)continue;const zone=this.zoneAt(x+5),width=zone==='pad'?210:zone==='ice'?600:zone==='water'?340:380;if(!zone||zone==='snow'||zone==='sand')continue;
    for(let xx=Math.max(x,from-50);xx<Math.min(x+width,to);xx+=18){if(this.track.bridgeAt(xx))continue;const y=this.track.height(xx);
@@ -68,10 +68,12 @@ export class StageEvents {
    }
    if(x>from&&x<to){const y=this.track.height(x-22);g.fillStyle(0x66513a).fillRect(x-25,y-47,5,46);g.fillStyle(0xf6d777).lineStyle(2,0x534637).beginPath().moveTo(x-43,y-45).lineTo(x-23,y-75).lineTo(x-3,y-45).closePath().fillPath().strokePath();g.lineStyle(3,0x534637).lineBetween(x-23,y-63,x-23,y-54);g.fillStyle(0x534637).fillCircle(x-23,y-49,1.5);}
   }
-  for(const o of this.objects){const b=o.body;if(b.position.x<from||b.position.x>to)continue;
-   g.fillStyle(o.kind==='crate'?0xbc8950:mix(this.stage.palette[1],0x50565b,.5)).lineStyle(2,0x514539).beginPath();b.vertices.forEach((v,i)=>i?g.lineTo(v.x,v.y):g.moveTo(v.x,v.y));g.closePath().fillPath().strokePath();
-   if(o.kind==='crate'){const v=b.vertices;g.lineStyle(4,0xead199).lineBetween(v[0].x+3,v[0].y+3,v[2].x-3,v[2].y-3);g.lineStyle(2,0x6f512e).lineBetween(v[1].x-2,v[1].y+2,v[3].x+2,v[3].y-2);}
-   else g.lineStyle(2,0xd1b295,.5).lineBetween(b.vertices[1].x,b.vertices[1].y,b.vertices[2].x,b.vertices[2].y);
+  for(const o of this.objects){const b=o.body,pose=sample(b);if(pose.position.x<from||pose.position.x>to)continue;
+   const da=pose.angle-b.angle,co=Math.cos(da),si=Math.sin(da);
+   const vertices=b.vertices.map(v=>{const x=v.x-b.position.x,y=v.y-b.position.y;return {x:pose.position.x+x*co-y*si,y:pose.position.y+x*si+y*co};});
+   g.fillStyle(o.kind==='crate'?0xbc8950:mix(this.stage.palette[1],0x50565b,.5)).lineStyle(2,0x514539).beginPath();vertices.forEach((v,i)=>i?g.lineTo(v.x,v.y):g.moveTo(v.x,v.y));g.closePath().fillPath().strokePath();
+   if(o.kind==='crate'){const v=vertices;g.lineStyle(4,0xead199).lineBetween(v[0].x+3,v[0].y+3,v[2].x-3,v[2].y-3);g.lineStyle(2,0x6f512e).lineBetween(v[1].x-2,v[1].y+2,v[3].x+2,v[3].y-2);}
+   else g.lineStyle(2,0xd1b295,.5).lineBetween(vertices[1].x,vertices[1].y,vertices[2].x,vertices[2].y);
   }
   const f=this.fx;f.clear();for(const p of this.dust)f.fillStyle(p.color,(1-p.life/p.max)*.55).fillCircle(p.x,p.y,p.r+p.life*5);
  }

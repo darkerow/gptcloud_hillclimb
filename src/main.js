@@ -5,6 +5,7 @@ import {VEHICLES,STAGES,vehicleById,stageById,tunedVehicle} from './catalog.js';
 import {Progress} from './progression.js';
 import {createVehicle,destroyVehicle,drawVehicle,driveVehicle,getContacts,headTouches} from './vehicles.js';
 import {VehicleCameraRig} from './camera.js';
+import {RenderMotion} from './motion.js';
 import {TrackWorld} from './world.js';
 import {GameInterface} from './interface.js';
 import {GameAudio} from './audio.js';
@@ -18,6 +19,7 @@ export class HillClimbScene extends Phaser.Scene {
     this.contacts={grounded:false,bodyHit:false};this.groundGrace=0;this.deadTimer=0;this.nitro=0;this.magnet=0;this.saveTimer=0;
     this.cursors=this.input.keyboard.createCursorKeys();this.keys=this.input.keyboard.addKeys({left:'A',right:'D'});
     this.cameras.main.setBounds(-400,-1200,1e9,3200);this.cameraRig=new VehicleCameraRig(this.cameras.main);
+    this.motion=new RenderMotion(this.matter.world);
     this.createRunWorld();this.ui=new GameInterface(this);this.matter.world.pause();
     this.onKey=e=>{
       if(e.repeat)return;
@@ -41,7 +43,7 @@ export class HillClimbScene extends Phaser.Scene {
     this.vehicle=createVehicle(this,this.vehicleType,START_X,this.track.height(START_X),spec);
     this.fuelCapacity=spec.fuel;this.fuel=this.fuelCapacity;this.emptyTime=0;this.nitro=0;this.magnet=0;
     this.run={coins:0,gems:0,air:0,flips:0,maxDistance:0,lastLevel:0,airCurrent:0,airAngle:0,airPaid:0,lastAngle:this.vehicle.body.angle,initialBest:this.progress.best(this.vehicleType,this.stageId),dailyComplete:false};
-    this.cameraRig.track(this.vehicle,this.scale.width);this.track.draw();
+    this.motion.reset();this.cameraRig.track(this.vehicle,this.scale.width);this.track.draw();
   }
   terrainY(x){return this.track.height(x);}
   followVehicle(){this.cameraRig.track(this.vehicle,this.scale.width);}
@@ -74,7 +76,9 @@ export class HillClimbScene extends Phaser.Scene {
     else {this.run.coins+=amount;if(this.runMode==='career')this.progress.data.coins+=amount;}
   }
   afterPhysics(event){
-    if(!this.vehicle)return;this.contacts=getContacts(this,this.vehicle);drawVehicle(this.vehicle);
+    if(!this.vehicle)return;this.contacts=getContacts(this,this.vehicle);
+    // Normal play draws once per render frame, not in the fixed-step callback.
+    if(!this.matter.world.autoUpdate)drawVehicle(this.vehicle);
     if(this.menuOpen||this.finished||!this.hasStarted)return;
     const dt=Math.min(event?.delta||1000/60,1000/30),seconds=dt/1000,body=this.vehicle.body,r=this.run;
     this.nitro=Math.max(0,this.nitro-seconds);this.magnet=Math.max(0,this.magnet-seconds);
@@ -119,11 +123,12 @@ export class HillClimbScene extends Phaser.Scene {
   }
   update(_,delta){
     if(!this.track)return;
-    if(!this.menuOpen&&!this.finished){this.cameraRig.update(delta);this.track.ensure(this.vehicle.body.position.x);this.terrainBodies=this.track.terrainBodies;this.saveTimer+=delta;if(this.saveTimer>1500){this.progress.save();this.saveTimer=0;}}
-    this.track.draw();this.ui?.update();this.audio.update(this.vehicle.body.velocity.x,this.vehicle.throttle,!this.menuOpen&&!this.finished,delta);
+    this.motion.beginFrame();drawVehicle(this.vehicle,this.motion.sample);
+    if(!this.menuOpen&&!this.finished){this.cameraRig.update(this.motion.frameDelta(delta),this.motion.sample);this.track.ensure(this.vehicle.body.position.x);this.terrainBodies=this.track.terrainBodies;this.saveTimer+=delta;if(this.saveTimer>1500){this.progress.save();this.saveTimer=0;}}
+    this.track.draw(this.motion.sample);this.ui?.update();this.audio.update(this.vehicle.body.velocity.x,this.vehicle.throttle,!this.menuOpen&&!this.finished,delta);
   }
   cleanup(){
-    this.progress.save();this.ui.destroy();this.audio.destroy();this.track.destroy();destroyVehicle(this,this.vehicle);this.cameraRig.destroy();
+    this.motion.destroy();this.progress.save();this.ui.destroy();this.audio.destroy();this.track.destroy();destroyVehicle(this,this.vehicle);this.cameraRig.destroy();
     this.scale.off('resize',this.resizeCamera,this);this.matter.world.off('beforeupdate',this.physicsInput,this);this.matter.world.off('afterupdate',this.afterPhysics,this);
     this.input.keyboard.off('keydown',this.onKey);window.removeEventListener('blur',this.onBlur);window.removeEventListener('pagehide',this.onPageHide);
   }

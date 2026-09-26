@@ -15,11 +15,12 @@ function damp(axis, target, seconds, smoothTime) {
   axis.velocity = (axis.velocity - omega * impulse) * decay;
 }
 
-export function vehicleCameraAnchor(vehicle) {
+export function vehicleCameraAnchor(vehicle, sample = body => body) {
   let x = 0, y = 0;
   for (const wheel of vehicle.wheels) {
-    x += wheel.position.x;
-    y += wheel.position.y;
+    const position = sample(wheel).position;
+    x += position.x;
+    y += position.y;
   }
   const count = vehicle.wheels.length;
   // Match the original framing without inheriting body lean or suspension bob.
@@ -55,11 +56,11 @@ export class VehicleCameraRig {
       this.vehicle.type === "monowheel" ? 15 : 60);
   }
 
-  update(deltaMs) {
+  update(deltaMs, sample = body => body) {
     if (!this.vehicle || !Number.isFinite(deltaMs) || deltaMs <= 0) return;
     // Don't turn a suspended tab / lost frame into a huge camera jump.
     const seconds = Math.min(deltaMs, 50) / 1000;
-    const anchor = vehicleCameraAnchor(this.vehicle);
+    const anchor = vehicleCameraAnchor(this.vehicle, sample);
     const error = anchor.y - this.heightTarget;
     if (Math.abs(error) > VERTICAL_DEAD_ZONE) {
       this.heightTarget = anchor.y - Math.sign(error) * VERTICAL_DEAD_ZONE;
