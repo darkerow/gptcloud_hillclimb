@@ -38,7 +38,8 @@ class HillClimbScene extends Phaser.Scene {
     this.createHud();
 
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, GAME_HEIGHT);
-    this.cameras.main.startFollow(this.car, true, 0.08, 0.08, -180, 70);
+    // A Matter body stores x/y on position, not directly on the body.
+    this.cameras.main.startFollow(this.car.position, true, 0.08, 0.08, -180, 70);
     this.cameras.main.setDeadzone(250, 170);
 
     this.scale.on("resize", () => {
@@ -388,7 +389,7 @@ class HillClimbScene extends Phaser.Scene {
     const spawnY = this.terrainY(spawnX) - 150;
 
     this.createCar(spawnX, spawnY);
-    this.cameras.main.startFollow(this.car, true, 0.08, 0.08, -180, 70);
+    this.cameras.main.startFollow(this.car.position, true, 0.08, 0.08, -180, 70);
     this.deadTimer = 0;
   }
 
