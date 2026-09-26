@@ -71,6 +71,14 @@ with sync_playwright() as p:
         print(kind, 'driven', json.dumps(state), flush=True)
         check(state['dx'] > 60, f'{kind}: throttle advances vehicle')
         check(not state['fallen'], f'{kind}: survives initial driving segment')
+        # The physics steps above run instantly; let the real camera catch up.
+        page.wait_for_function("""() => {
+          const s=window.__hillClimb.scene.getScene('HillClimb');
+          const c=s.cameras.main, p=s.vehicle.body.position;
+          return Math.abs(p.x-c.scrollX-c.width/2-c.followOffset.x)<30
+            && Math.abs(p.y-c.scrollY-c.height/2-c.followOffset.y)<30;
+        }""")
+        check(True, f'{kind}: camera follows vehicle')
         page.screenshot(path=str(SHOTS / f'{kind}-desktop.png'))
         page.locator('#open-garage').click()
         check(page.evaluate(f'!{SCENE}.matter.world.enabled'), 'Garage pauses physics')
@@ -126,7 +134,7 @@ with sync_playwright() as p:
     check(page.evaluate(f'{SCENE}.ui.throttle') == 1, 'Touch throttle pressed')
     cdp.send('Input.dispatchTouchEvent',{'type':'touchStart','touchPoints':[a,b]})
     check(page.evaluate(f'{SCENE}.ui.throttle') == 0, 'Both pedals pressed cancel each other')
-    cdp.send('Input.dispatchTouchEvent',{'type':'touchEnd','touchPoints':[a]})
+    cdp.send('Input.dispatchTouchEvent',{'type':'touchEnd','touchPoints':[b]})
     check(page.evaluate(f'{SCENE}.ui.throttle') == 1, 'Releasing brake keeps throttle held')
     cdp.send('Input.dispatchTouchEvent',{'type':'touchEnd','touchPoints':[]})
     check(page.evaluate(f'{SCENE}.ui.throttle') == 0, 'Touch release clears throttle')
