@@ -1,0 +1,25 @@
+name: Motion review bundle
+on:
+  push:
+    branches: [feature/render-interpolation]
+    paths: [.github/workflows/motion-review-bundle.yml]
+permissions:
+  contents: read
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --no-audit --no-fund
+      - run: tar -czf motion-source.tar.gz src tests docs index.html package.json package-lock.json vite.config.js node_modules
+      - uses: actions/upload-artifact@v4
+        with:
+          name: motion-review-source
+          path: motion-source.tar.gz
+          retention-days: 1
