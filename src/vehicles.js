@@ -80,11 +80,11 @@ export function headTouches(scene,v){
   const p=headPosition(v),bodies=scene.matter.world.localWorld.bodies.filter(b=>b.label==='terrain');
   return Query.point(bodies,p).length>0;
 }
-export function drawVehicle(v){
-  const {body,wheels,graphics:g,spec}=v;g.clear();
+export function drawVehicle(v,sample=body=>body){
+  const {graphics:g,spec}=v,body=sample(v.body),wheels=v.wheels.map(sample);g.clear();
   const co=Math.cos(body.angle),si=Math.sin(body.angle);
   for(const s of v.suspension){
-    const a={x:body.position.x+s.wx*co-s.anchorY*si,y:body.position.y+s.wx*si+s.anchorY*co},b=s.wheel.position;
+    const a={x:body.position.x+s.wx*co-s.anchorY*si,y:body.position.y+s.wx*si+s.anchorY*co},b=sample(s.wheel).position;
     const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy),nx=-dy/(len||1),ny=dx/(len||1);
     g.lineStyle(6,0x303d45).lineBetween(a.x,a.y,b.x,b.y);
     g.lineStyle(2,0xd4dde1).lineBetween(a.x+2,a.y,b.x+2,b.y);
