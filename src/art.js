@@ -1,3 +1,4 @@
+import {vehiclePreview} from './vehicle-art.js';
 import {hex} from './catalog.js';
 export const icons={
   wheel:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="m6 6 4 4m4 4 4 4M6 18l4-4m4-4 4-4"/>',
@@ -22,36 +23,22 @@ export const icons={
   close:'<path d="m6 6 12 12M6 18 18 6"/>'
 };
 export const icon=(name)=>`<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[name]||icons.wheel}</svg>`;
-const wheel=(x,y,r)=>`<circle cx="${x}" cy="${y}" r="${r}" fill="#243747"/><circle cx="${x}" cy="${y}" r="${r-5}" fill="none" stroke="#496272" stroke-width="3"/><circle cx="${x}" cy="${y}" r="${r*.48}" fill="#c4d6db"/><path d="M${x-r*.65} ${y}h${r*1.3}M${x} ${y-r*.65}v${r*1.3}" stroke="#657f8d" stroke-width="3"/><circle cx="${x}" cy="${y}" r="4" fill="#263c4d"/>`;
-export function vehicleArt(v){
-  const c=hex(v.color),a=v.style;let shape='';
-  if(a==='mono')shape=`${wheel(138,137,29)}<g stroke="#263f52" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"><path d="m124 111-2-17h29l9 22-13 17h-21z" fill="#345768"/><path d="m130 77-13 25 16 30m7-55 20 24-16 31" fill="none" stroke-width="10"/><path d="m121 43 21-5 12 38-24 12-14-13z" fill="${c}"/><path d="m139 46 25 17 14-14" fill="none" stroke="${c}" stroke-width="9"/><circle cx="128" cy="25" r="18" fill="#29465d"/><path d="m130 14 21 4 2 11-23 3" fill="#9ce9ec"/><path d="m130 34 24 1-10 13-20-7" fill="${c}"/><path d="M123 135h37" stroke-width="7"/></g>`;
-  else{
-    const r=a==='monster'?36:a==='tractor'?35:a==='race'?23:28;
-    const left=a==='race'?46:56,right=a==='bus'||a==='truck'||a==='fire'?219:207;
-    shape=wheel(left,138,r)+wheel(right,138,v.frontRadius?Math.max(19,r-10):r);
-    if(v.wheelCount>=3)shape+=wheel(132,138,a==='tank'?23:r);
-    if(a==='tank')shape+=wheel(94,138,23)+wheel(168,138,23);
-    let body='';
-    if(a==='bike')body=`<path d="m56 138 63-58 88 58H56m151 0-21-64-26-9" fill="none" stroke="${c}" stroke-width="8"/><path d="m92 99 58 2" stroke="#273c4f" stroke-width="10"/><path d="m117 59-10 29 25 34m-9-70 38 30" fill="none" stroke="#35566e" stroke-width="10"/><path d="m108 37 23-2 10 35-29 3z" fill="${c}"/><circle cx="119" cy="23" r="16" fill="#29475e"/><path d="m120 13 18 6v10h-18" fill="#b4edec"/>`;
-    else if(a==='tank')body=`<path d="M30 106h199l12 30H26z" fill="${c}"/><path d="m91 105 12-34h63l25 34" fill="${c}"/><path d="M157 80h74v13h-74" fill="#6a7e5b"/>`;
-    else if(['bus','truck','fire','ambulance','van'].includes(a)){
-      body=`<path d="M22 63h190l32 29v39H22z" fill="${c}"/><path d="M180 74h27l24 21h-51z" fill="#bfe8ee"/><path d="M170 65v63" fill="none"/><path d="M31 118h125" stroke="#ffd178" stroke-width="5"/>`;
-      if(['bus','van'].includes(a))for(let x=34;x<153;x+=33)body+=`<rect x="${x}" y="75" width="24" height="24" rx="2" fill="#bddde7"/>`;
-      if(a==='ambulance')body+='<path d="M88 72v38M70 91h36" stroke="#de554b" stroke-width="12"/>';
-      if(a==='fire')body+='<path d="M27 48h173M27 59h173M45 48v11m25-11v11m25-11v11m25-11v11m25-11v11m25-11v11" stroke="#91aab6" stroke-width="4"/>';
-      if(a==='truck')body+=`<path d="M25 51h129v53H25z" fill="${c}"/>`;
-    }else if(a==='tractor')body=`<path d="M25 90h89v-9h116v49H25z" fill="${c}"/><path d="M38 43h61v58H38z" fill="#c9e6db"/><path d="M29 40h80m71 43v39" stroke="${c}" stroke-width="9"/>`;
-    else if(a==='race')body=`<path d="m23 109 57-11 29-21h38l31 29 61 12v16H22z" fill="${c}"/><path d="m112 76 25-15 22 33h-40" fill="#344d61"/><path d="M25 80h47v9H25M211 121h40v10h-40" fill="${c}"/>`;
-    else if(a==='hover')body=`<ellipse cx="139" cy="133" rx="109" ry="25" fill="#2e495a"/><path d="m30 110 48-28h115l48 28-17 28H44z" fill="${c}"/><path d="m91 83 24-43h41l34 43" fill="#b6e5e9"/><circle cx="55" cy="87" r="22" fill="#435e6c"/><path d="m43 72 24 28m0-28-24 28" stroke="#c0e6df" stroke-width="5"/>`;
-    else if(a==='rocket')body=`<path d="m26 91 165 0 55 22-55 23H26z" fill="${c}"/><path d="m27 94-32 17 32 20" fill="#ffc361"/><path d="m100 91 15-31h39l33 31" fill="#bde8ec"/>`;
-    else{body=`<path d="M28 98h146l58 20-4 18H28z" fill="${c}"/><path d="m82 98 29-44h52l29 44z" fill="#c3e9ec"/><path d="M136 56v41" stroke="#2b475a"/><path d="M37 115h73" stroke="#ffc866" stroke-width="5"/>`;
-      if(a==='buggy')body+=`<path d="m65 99 35-56h68l35 56" fill="none" stroke="#334f61" stroke-width="6"/>`;
-      if(a==='police')body+='<path d="M27 117h198" stroke="#345c81" stroke-width="12"/><path d="M127 47h19" stroke="#63bfdc" stroke-width="7"/><path d="M146 47h19" stroke="#e8675d" stroke-width="7"/>';
-      if(a==='hotrod')body+='<path d="M183 87v23m14-23v23m14-23v23" stroke="#7499a9" stroke-width="6"/>';
-    }
-    shape+=`<g stroke="#2c4354" stroke-width="3.5" stroke-linejoin="round">${body}</g>`;
-  }
-  return `<svg class="vehicle-art" viewBox="0 0 280 185" role="img" aria-label="${v.name}"><ellipse cx="140" cy="165" rx="115" ry="9" fill="#284757" opacity=".11"/>${shape}</svg>`;
+export function vehicleArt(v){return `<img class="vehicle-art" src="${vehiclePreview(v)}" alt="${v.name}" draggable="false" width="360" height="200">`;}
+let previewId=0;
+export function stageArt(s){
+ const id=`vista-${s.id}-${previewId++}`,[sky,soil,cap,line,mount,accent]=s.palette.map(hex),dark=['night','moon','mars','purple','lava'].includes(s.theme),ice=s.theme==='ice';
+ let props='';
+ const tree=(x,y,i)=>s.id==='forest'||ice?`<path d="M${x} ${y}v-51" stroke="#66513b" stroke-width="6"/><path d="m${x-22} ${y-9} 22-60 23 60Zm5-20 17-48 18 48" fill="${ice?'#598d88':'#3f7e43'}" stroke="#365b3c" stroke-width="2"/>`:`<path d="M${x} ${y}v-49" stroke="#6d5039" stroke-width="6"/><path d="m${x} ${y-18}-15-20m15 16 17-21" stroke="#6d5039" stroke-width="3"/><g fill="${s.theme==='autumn'?'#d5953b':'#64a743'}" stroke="${s.theme==='autumn'?'#996539':'#427d3b'}" stroke-width="2"><circle cx="${x-17}" cy="${y-46}" r="20"/><circle cx="${x+16}" cy="${y-48}" r="22"/><circle cx="${x-2}" cy="${y-65}" r="24"/></g><circle cx="${x-8}" cy="${y-71}" r="14" fill="${s.theme==='autumn'?'#efc45b':'#8ec455'}"/>`;
+ for(let i=0;i<6;i++){
+  const x=30+i*115,y=219+Math.sin(i*2+s.seed)*15;
+  if(['green','forest','autumn','night'].includes(s.theme)&&s.hazard!=='ceiling')props+=tree(x,y,i);
+  if(s.theme==='desert')props+=`<path d="M${x} ${y}v-50m0 27h-16v-23m16 11h17v-27" stroke="#557544" stroke-width="10" stroke-linecap="round" fill="none"/><path d="M${x-2} ${y-3}v-47" stroke="#8fa962" stroke-width="3"/>`;
+  if(s.theme==='beach')props+=`<path d="m${x} ${y} 10-61" stroke="#a27642" stroke-width="7"/><path d="m${x+10} ${y-61}-30 4 23-16 7 8 9-12 25 22-30-6 20 26Z" fill="#528c3b"/>`;
+  if(s.theme==='city')props+=`<path d="M${x-30} ${y}v-${60+i%3*18}h57V${y}" fill="${i%2?'#829697':'#a58573'}" stroke="#52626c" stroke-width="3"/><path d="M${x-19} ${y-48}h10m14 0h10m-34 18h10m14 0h10" stroke="#f7e9b4" stroke-width="11"/>`;
+  if(ice)props+=tree(x,y,i);
+  if(['moon','mars','purple'].includes(s.theme))props+=`<ellipse cx="${x}" cy="${y}" rx="29" ry="9" fill="${mount}"/><path d="m${x-20} ${y} 5-9 13-4 11 14" fill="${cap}" stroke="${line}" stroke-width="2"/>`;
+ }
+ const stars=dark?Array.from({length:25},(_,i)=>`<circle cx="${(i*97+49)%640}" cy="${(i*37+14)%185}" r="${i%4===0?1.6:1}" fill="#fff3cf" opacity=".8"/>`).join(''):'';
+ const defs=`<defs><linearGradient id="${id}" x2="0" y2="1"><stop stop-color="${sky}"/><stop offset="1" stop-color="${dark?mount:'#e3f4ea'}"/></linearGradient><pattern id="${id}-dirt" width="54" height="38" patternUnits="userSpaceOnUse"><rect width="54" height="38" fill="${soil}"/><path d="m6 12 7-3 5 5-4 3Zm29 19 6-3 4 3-4 2" fill="${line}" opacity=".25"/><path d="m6 11 7-2m24 3h5" stroke="${accent}" opacity=".2" stroke-width="2"/></pattern></defs>`;
+ return `<svg class="stage-art" viewBox="0 0 640 320" preserveAspectRatio="xMidYMid slice" aria-hidden="true">${defs}<rect width="640" height="320" fill="url(#${id})"/>${stars}<circle cx="510" cy="66" r="30" fill="${dark?'#e4e1bd':'#fff0a5'}"/>${s.id==='moon'?'<circle cx="504" cy="62" r="23" fill="#699dae"/><path d="m493 48 19 4-5 18-8 5-8-16" fill="#97c38a"/>':''}<path d="M0 188Q80 80 149 156T289 146T429 164T640 119V320H0" fill="${mount}" opacity=".5"/><path d="M0 220 80 144 122 183 197 125 269 202 346 162 438 217 520 136 640 210V320H0" fill="${mount}"/>${s.theme==='ice'||s.id==='mountain'?'<path d="m157 164 40-39 31 37-24-12-8 7-10-8Zm338-1 25-27 30 29-25-10-6 7-9-8" fill="#e2f1ed"/>':''}${props}<path d="M-5 225Q65 179 146 221T300 227T467 222T650 236V325H-5" fill="url(#${id}-dirt)" stroke="${line}" stroke-width="5"/><path d="M-5 222Q65 176 146 218T300 224T467 219T650 233" fill="none" stroke="${cap}" stroke-width="14"/><path d="M-5 216Q65 170 146 212T300 218T467 213T650 227" fill="none" stroke="${ice?'#f5ffff':s.theme==='green'?'#afe257':accent}" stroke-width="3"/>${s.hazard==='ceiling'?`<path d="M0 0H640V22l-43 12-30-15-25 47-25-42-67 24-38-30-52 38-21-33-41 15-39-13-53 30-40-39-39 22-35-18-52 14Z" fill="${soil}" stroke="${line}" stroke-width="4"/>`:''}${s.id==='rainbow'?'<path d="M40 188Q320-130 600 188" fill="none" stroke="#dc83b6" stroke-width="13" opacity=".45"/><path d="M40 202Q320-100 600 202" fill="none" stroke="#b3dfa1" stroke-width="12" opacity=".45"/>':''}</svg>`;
 }
-export function stageArt(s){const [sky,soil,cap,line,mount,accent]=s.palette.map(hex);return `<svg class="stage-art" viewBox="0 0 320 145" aria-hidden="true"><rect width="320" height="145" fill="${sky}"/><circle cx="255" cy="33" r="17" fill="${accent}"/><path d="M0 117 63 50 134 112 207 61 320 120V145H0" fill="${mount}" opacity=".7"/><path d="M-5 104 Q42 ${45+s.seed%4*12} 93 95T189 93T329 97V145H-5" fill="${soil}" stroke="${line}" stroke-width="5"/><path d="M-5 103 Q42 ${45+s.seed%4*12} 93 94T189 92T329 96" fill="none" stroke="${cap}" stroke-width="13"/>${s.hazard==='ceiling'?`<path d="M0 0H320v18l-35 9-15-12-28 20-22-17-46 19-43-20-49 12-25-18L0 30z" fill="${soil}"/>`:''}</svg>`;}
