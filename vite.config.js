@@ -1,6 +1,2 @@
-import { defineConfig } from "vite";
-
-export default defineConfig({
-  // Relative asset URLs also work under /gptcloud_hillclimb/ on GitHub Pages.
-  base: "./"
-});
+import { defineConfig } from 'vite';
+export default defineConfig({base:'./',build:{rollupOptions:{output:{manualChunks:{phaser:['phaser']}}}}});
