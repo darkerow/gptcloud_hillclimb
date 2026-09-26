@@ -1,0 +1,462 @@
+--- a/src/main.js
++++ b/src/main.js
+@@ -7,2 +7,3 @@
+ import {VehicleCameraRig} from './camera.js';
++import {RenderMotion} from './motion.js';
+ import {TrackWorld} from './world.js';
+@@ -20,2 +21,3 @@
+     this.cameras.main.setBounds(-400,-1200,1e9,3200);this.cameraRig=new VehicleCameraRig(this.cameras.main);
++    this.motion=new RenderMotion(this.matter.world);
+     this.createRunWorld();this.ui=new GameInterface(this);this.matter.world.pause();
+@@ -43,3 +45,3 @@
+     this.run={coins:0,gems:0,air:0,flips:0,maxDistance:0,lastLevel:0,airCurrent:0,airAngle:0,airPaid:0,lastAngle:this.vehicle.body.angle,initialBest:this.progress.best(this.vehicleType,this.stageId),dailyComplete:false};
+-    this.cameraRig.track(this.vehicle,this.scale.width);this.track.draw();
++    this.motion.reset();this.cameraRig.track(this.vehicle,this.scale.width);this.track.draw();
+   }
+@@ -76,3 +78,5 @@
+   afterPhysics(event){
+-    if(!this.vehicle)return;this.contacts=getContacts(this,this.vehicle);drawVehicle(this.vehicle);
++    if(!this.vehicle)return;this.contacts=getContacts(this,this.vehicle);
++    // Normal play draws once per render frame, not in the fixed-step callback.
++    if(!this.matter.world.autoUpdate)drawVehicle(this.vehicle);
+     if(this.menuOpen||this.finished||!this.hasStarted)return;
+@@ -121,7 +125,8 @@
+     if(!this.track)return;
+-    if(!this.menuOpen&&!this.finished){this.cameraRig.update(delta);this.track.ensure(this.vehicle.body.position.x);this.terrainBodies=this.track.terrainBodies;this.saveTimer+=delta;if(this.saveTimer>1500){this.progress.save();this.saveTimer=0;}}
+-    this.track.draw();this.ui?.update();this.audio.update(this.vehicle.body.velocity.x,this.vehicle.throttle,!this.menuOpen&&!this.finished,delta);
++    this.motion.beginFrame();drawVehicle(this.vehicle,this.motion.sample);
++    if(!this.menuOpen&&!this.finished){this.cameraRig.update(this.motion.frameDelta(delta),this.motion.sample);this.track.ensure(this.vehicle.body.position.x);this.terrainBodies=this.track.terrainBodies;this.saveTimer+=delta;if(this.saveTimer>1500){this.progress.save();this.saveTimer=0;}}
++    this.track.draw(this.motion.sample);this.ui?.update();this.audio.update(this.vehicle.body.velocity.x,this.vehicle.throttle,!this.menuOpen&&!this.finished,delta);
+   }
+   cleanup(){
+-    this.progress.save();this.ui.destroy();this.audio.destroy();this.track.destroy();destroyVehicle(this,this.vehicle);this.cameraRig.destroy();
++    this.motion.destroy();this.progress.save();this.ui.destroy();this.audio.destroy();this.track.destroy();destroyVehicle(this,this.vehicle);this.cameraRig.destroy();
+     this.scale.off('resize',this.resizeCamera,this);this.matter.world.off('beforeupdate',this.physicsInput,this);this.matter.world.off('afterupdate',this.afterPhysics,this);
+--- a/src/camera.js
++++ b/src/camera.js
+@@ -17,7 +17,8 @@
+ 
+-export function vehicleCameraAnchor(vehicle) {
++export function vehicleCameraAnchor(vehicle, sample = body => body) {
+   let x = 0, y = 0;
+   for (const wheel of vehicle.wheels) {
+-    x += wheel.position.x;
+-    y += wheel.position.y;
++    const position = sample(wheel).position;
++    x += position.x;
++    y += position.y;
+   }
+@@ -57,3 +58,3 @@
+ 
+-  update(deltaMs) {
++  update(deltaMs, sample = body => body) {
+     if (!this.vehicle || !Number.isFinite(deltaMs) || deltaMs <= 0) return;
+@@ -61,3 +62,3 @@
+     const seconds = Math.min(deltaMs, 50) / 1000;
+-    const anchor = vehicleCameraAnchor(this.vehicle);
++    const anchor = vehicleCameraAnchor(this.vehicle, sample);
+     const error = anchor.y - this.heightTarget;
+--- a/src/vehicles.js
++++ b/src/vehicles.js
+@@ -82,7 +82,7 @@
+ }
+-export function drawVehicle(v){
+-  const {body,wheels,graphics:g,spec}=v;g.clear();
++export function drawVehicle(v,sample=body=>body){
++  const {graphics:g,spec}=v,body=sample(v.body),wheels=v.wheels.map(sample);g.clear();
+   const co=Math.cos(body.angle),si=Math.sin(body.angle);
+   for(const s of v.suspension){
+-    const a={x:body.position.x+s.wx*co-s.anchorY*si,y:body.position.y+s.wx*si+s.anchorY*co},b=s.wheel.position;
++    const a={x:body.position.x+s.wx*co-s.anchorY*si,y:body.position.y+s.wx*si+s.anchorY*co},b=sample(s.wheel).position;
+     const dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy),nx=-dy/(len||1),ny=dx/(len||1);
+--- a/src/world.js
++++ b/src/world.js
+@@ -84,8 +84,9 @@
+   drawSky(){drawSkyArt(this);}
+-  draw(){
+-    this.drawSky();this.events.draw();const g=this.deck;g.clear();const c=this.scene.cameras.main,min=c.scrollX-300,max=c.scrollX+c.width+300;
++  draw(sample=body=>body){
++    this.drawSky();this.events.draw(sample);const g=this.deck;g.clear();const c=this.scene.cameras.main,min=c.scrollX-300,max=c.scrollX+c.width+300;
+     for(const b of this.bridges){if(b.end<min||b.start>max)continue;
+       for(const x of [b.start-10,b.end+10])g.fillStyle(0x594532).fillRoundedRect(x-6,b.y-88,12,110,3);
+-      g.lineStyle(4,0x685140).beginPath().moveTo(b.start-10,b.y-76);for(const p of b.planks)g.lineTo(p.position.x,p.position.y-62);g.lineTo(b.end+10,b.y-76).strokePath();
+-      b.planks.forEach((p,i)=>{
++      g.lineStyle(4,0x685140).beginPath().moveTo(b.start-10,b.y-76);for(const plank of b.planks){const p=sample(plank);g.lineTo(p.position.x,p.position.y-62);}g.lineTo(b.end+10,b.y-76).strokePath();
++      b.planks.forEach((plank,i)=>{
++        const p=sample(plank);
+         if(i%2===0)g.lineStyle(2,0x97744c).lineBetween(p.position.x,p.position.y-62,p.position.x,p.position.y-7);
+--- a/src/stage-events.js
++++ b/src/stage-events.js
+@@ -60,3 +60,3 @@
+  }
+- draw(){
++ draw(sample=body=>body){
+   const g=this.g;g.clear();const c=this.scene.cameras.main,from=c.scrollX-100,to=c.scrollX+c.width+100;
+@@ -70,6 +70,8 @@
+   }
+-  for(const o of this.objects){const b=o.body;if(b.position.x<from||b.position.x>to)continue;
+-   g.fillStyle(o.kind==='crate'?0xbc8950:mix(this.stage.palette[1],0x50565b,.5)).lineStyle(2,0x514539).beginPath();b.vertices.forEach((v,i)=>i?g.lineTo(v.x,v.y):g.moveTo(v.x,v.y));g.closePath().fillPath().strokePath();
+-   if(o.kind==='crate'){const v=b.vertices;g.lineStyle(4,0xead199).lineBetween(v[0].x+3,v[0].y+3,v[2].x-3,v[2].y-3);g.lineStyle(2,0x6f512e).lineBetween(v[1].x-2,v[1].y+2,v[3].x+2,v[3].y-2);}
+-   else g.lineStyle(2,0xd1b295,.5).lineBetween(b.vertices[1].x,b.vertices[1].y,b.vertices[2].x,b.vertices[2].y);
++  for(const o of this.objects){const b=o.body,pose=sample(b);if(pose.position.x<from||pose.position.x>to)continue;
++   const da=pose.angle-b.angle,co=Math.cos(da),si=Math.sin(da);
++   const vertices=b.vertices.map(v=>{const x=v.x-b.position.x,y=v.y-b.position.y;return {x:pose.position.x+x*co-y*si,y:pose.position.y+x*si+y*co};});
++   g.fillStyle(o.kind==='crate'?0xbc8950:mix(this.stage.palette[1],0x50565b,.5)).lineStyle(2,0x514539).beginPath();vertices.forEach((v,i)=>i?g.lineTo(v.x,v.y):g.moveTo(v.x,v.y));g.closePath().fillPath().strokePath();
++   if(o.kind==='crate'){const v=vertices;g.lineStyle(4,0xead199).lineBetween(v[0].x+3,v[0].y+3,v[2].x-3,v[2].y-3);g.lineStyle(2,0x6f512e).lineBetween(v[1].x-2,v[1].y+2,v[3].x+2,v[3].y-2);}
++   else g.lineStyle(2,0xd1b295,.5).lineBetween(vertices[1].x,vertices[1].y,vertices[2].x,vertices[2].y);
+   }
+--- /dev/null
++++ b/src/motion.js
+@@ -0,0 +1,89 @@
++/** Render solved Matter poses between fixed ticks without ever moving a collider.
++ * Phaser 3.90 / Matter 0.20 keeps half a tick in the runner's time buffer.
++ * The browser regression exercises the real World.update to guard this contract.
++ */
++export function renderAlpha(runner) {
++  const step = runner?.delta;
++  if (!(step > 0) || !Number.isFinite(runner.timeBuffer)) return 1;
++  return Math.max(0, Math.min(1, runner.timeBuffer / step - 0.5));
++}
++
++const copy = body => ({ x: body.position.x, y: body.position.y, angle: body.angle });
++function write(to, body) {
++  to.x = body.position.x; to.y = body.position.y; to.angle = body.angle;
++}
++
++export class RenderMotion {
++  constructor(world) {
++    this.world = world;
++    this.sample = this.sample.bind(this);
++    this.reset();
++    world.on('beforeupdate', this.beforeStep, this);
++    world.on('afterupdate', this.afterStep, this);
++  }
++
++  reset() {
++    // Weak keys let streamed-out bridges and obstacles be garbage-collected.
++    this.poses = new WeakMap();
++    this.alpha = 1;
++  }
++
++  seed(body) {
++    const entry = { previous: copy(body), current: copy(body),
++      view: { position: { ...body.position }, angle: body.angle } };
++    this.poses.set(body, entry);
++    return entry;
++  }
++
++  beforeStep() {
++    for (const body of this.world.getAllBodies()) {
++      if (body.isStatic) continue;
++      const entry = this.poses.get(body) || this.seed(body);
++      // Do NOT use Body.positionPrev: the solver changes it to encode velocity.
++      write(entry.previous, body);
++    }
++  }
++
++  afterStep() {
++    for (const body of this.world.getAllBodies()) {
++      if (body.isStatic) continue;
++      const entry = this.poses.get(body) || this.seed(body);
++      write(entry.current, body);
++    }
++  }
++
++  beginFrame() {
++    // Preserve the exact displayed pose while paused, including a mid-tick pause.
++    if (this.world.enabled && this.world.autoUpdate) this.alpha = renderAlpha(this.world.runner);
++  }
++
++  frameDelta(fallback) {
++    // The native runner can smooth/snap elapsed time. Camera damping must use
++    // that SAME clock, not Phaser's separately smoothed render delta.
++    const delta = this.world.autoUpdate ? this.world.runner.frameDelta : fallback;
++    return Number.isFinite(delta) && delta > 0 ? delta : fallback;
++  }
++
++  sample(body) {
++    // Manual physics stepping remains exact for debugging and offline tests.
++    if (body.isStatic || !this.world.autoUpdate) return body;
++    let e = this.poses.get(body);
++    if (!e) return body;
++    if (body.position.x !== e.current.x || body.position.y !== e.current.y || body.angle !== e.current.angle) {
++      // Explicit repositioning / respawn must never interpolate from the old pose.
++      e = this.seed(body);
++    }
++    const a = this.alpha, p = e.previous, q = e.current, v = e.view;
++    v.position.x = p.x + (q.x - p.x) * a;
++    v.position.y = p.y + (q.y - p.y) * a;
++    // Matter angles are continuous, including spinning wheels and full flips.
++    v.angle = p.angle + (q.angle - p.angle) * a;
++    return v;
++  }
++
++  destroy() {
++    this.world.off('beforeupdate', this.beforeStep, this);
++    this.world.off('afterupdate', this.afterStep, this);
++    this.reset();
++  }
++}
+--- /dev/null
++++ b/tests/motion.test.mjs
+@@ -0,0 +1,94 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import { RenderMotion, renderAlpha } from '../src/motion.js';
++import { vehicleCameraAnchor } from '../src/camera.js';
++
++function fixture() {
++  const body = { position: { x: 100, y: 200 }, angle: 0, isStatic: false };
++  const events = new Map();
++  const world = { autoUpdate: true, enabled: true, runner: { delta: 1000 / 60, timeBuffer: 0 },
++    getAllBodies: () => [body],
++    on(name, fn, context) { events.set(name, { fn, context }); },
++    off(name) { events.delete(name); },
++    emit(name) { const e = events.get(name); e?.fn.call(e.context); } };
++  const motion = new RenderMotion(world);
++  const tick = (dx = 10, dy = 4, da = 0.2) => {
++    world.emit('beforeupdate');
++    body.position.x += dx; body.position.y += dy; body.angle += da;
++    world.emit('afterupdate');
++  };
++  return { body, world, motion, tick, events };
++}
++
++test('Matter 3.90 buffer margin gives a continuous interpolation phase', () => {
++  for (const [buffer, expected] of [[0, 0], [0.5, 0], [0.75, 0.25], [1, 0.5], [1.5, 1], [3, 1]]) {
++    assert.ok(Math.abs(renderAlpha({ delta: 20, timeBuffer: buffer * 20 }) - expected) < 1e-10);
++  }
++  assert.equal(renderAlpha({ delta: 0, timeBuffer: 5 }), 1);
++  assert.equal(renderAlpha({ delta: 20, timeBuffer: NaN }), 1);
++});
++
++test('render both location and wheel rotation on frames with no physics tick', () => {
++  const { body, world, motion, tick } = fixture();
++  tick();
++  for (const a of [0, 0.25, 0.5, 0.75, 1]) {
++    world.runner.timeBuffer = (a + 0.5) * world.runner.delta; motion.beginFrame();
++    const pose = motion.sample(body);
++    assert.ok(Math.abs(pose.position.x - (100 + 10 * a)) < 1e-10);
++    assert.ok(Math.abs(pose.position.y - (200 + 4 * a)) < 1e-10);
++    assert.ok(Math.abs(pose.angle - 0.2 * a) < 1e-10);
++    assert.deepEqual(body.position, { x: 110, y: 204 });
++  }
++});
++
++test('multiple ticks keep the last solved pair and never use velocity-history positions', () => {
++  const { body, motion, tick } = fixture();
++  tick(); tick(); body.positionPrev = { x: -9999, y: -9999 };
++  motion.alpha = 0.5;
++  assert.equal(motion.sample(body).position.x, 115);
++  tick(); motion.alpha = 0;
++  assert.equal(motion.sample(body).position.x, 120);
++});
++
++test('camera and suspension can sample exactly the same wheel poses', () => {
++  const { body, motion, tick } = fixture(); tick(); motion.alpha = 0.5;
++  const anchor = vehicleCameraAnchor({ type: 'car', wheels: [body] }, motion.sample);
++  assert.deepEqual(anchor, { x: 105, y: 159 });
++  assert.equal(body.position.x, 110);
++});
++
++test('pause freezes interpolation; resume continues the existing solved pair', () => {
++  const { body, world, motion, tick } = fixture(); tick(); motion.alpha = 0.4;
++  const x = motion.sample(body).position.x;
++  world.enabled = false; world.runner.timeBuffer = 10000; motion.beginFrame();
++  assert.equal(motion.sample(body).position.x, x);
++  world.enabled = true; world.runner.timeBuffer = world.runner.delta; motion.beginFrame();
++  assert.equal(motion.sample(body).position.x, 105);
++});
++
++test('teleports, restarts, static bodies and manual stepping do not render stale poses', () => {
++  const { body, world, motion, tick, events } = fixture(); tick(); motion.alpha = 0.2;
++  body.position.x = 8000;
++  assert.equal(motion.sample(body).position.x, 8000);
++  motion.reset(); assert.equal(motion.sample(body), body);
++  tick(); world.autoUpdate = false; assert.equal(motion.sample(body), body);
++  world.autoUpdate = true; body.isStatic = true; assert.equal(motion.sample(body), body);
++  motion.destroy(); assert.equal(events.size, 0);
++});
++
++test('spinning angles stay continuous across full revolutions', () => {
++  const { body, motion, tick } = fixture(); body.angle = Math.PI * 12 - 0.1;
++  tick(0, 0, 0.4); motion.alpha = 0.5;
++  assert.ok(Math.abs(motion.sample(body).angle - (Math.PI * 12 + 0.1)) < 1e-10);
++});
++
++
++test('camera elapsed time matches the accepted physics runner clock', () => {
++  const { world, motion } = fixture();
++  world.runner.frameDelta = 9;
++  assert.equal(motion.frameDelta(24), 9);
++  world.runner.frameDelta = NaN;
++  assert.equal(motion.frameDelta(24), 24);
++  world.autoUpdate = false; world.runner.frameDelta = 9;
++  assert.equal(motion.frameDelta(24), 24);
++});
+--- /dev/null
++++ b/tests/motion_smoke.py
+@@ -0,0 +1,120 @@
++"""Frame-level motion regression using the production build and Phaser's real loop.
++Unlike fixed-physics-only tests, this executes frames with zero/one/multiple ticks.
++"""
++from functools import partial
++from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
++from pathlib import Path
++from threading import Thread
++import importlib.util
++import json
++import os
++from playwright.sync_api import sync_playwright
++
++ROOT = Path(__file__).resolve().parents[1]
++OUT = ROOT / 'test-results'
++OUT.mkdir(exist_ok=True)
++
++class Quiet(SimpleHTTPRequestHandler):
++    def log_message(self, *_): pass
++
++server = ThreadingHTTPServer(('127.0.0.1', 0), partial(Quiet, directory=str(ROOT / 'dist')))
++Thread(target=server.serve_forever, daemon=True).start()
++
++try:
++    with sync_playwright() as p:
++        options = {'args': ['--no-sandbox', '--disable-dev-shm-usage']}
++        if os.getenv('CHROMIUM_BIN'):
++            options['executable_path'] = os.environ['CHROMIUM_BIN']
++        browser = p.chromium.launch(**options)
++        report = []
++        for width, height in [(1280, 720), (390, 844)]:
++            page = browser.new_page(viewport={'width': width, 'height': height})
++            errors = []
++            page.on('pageerror', lambda e: errors.append(str(e)))
++            if os.getenv('HILL_TEST_MEMORY'):
++                spec = importlib.util.spec_from_file_location('boot', ROOT / '.local/in_memory.py')
++                module = importlib.util.module_from_spec(spec)
++                spec.loader.exec_module(module)
++                module.boot(page)
++            else:
++                page.goto(f'http://127.0.0.1:{server.server_port}/?test')
++                page.wait_for_selector('#start-run')
++            page.evaluate('__hillClimb.loop.stop()')
++            for vehicle in ['car', 'monowheel']:
++                for fps in [30, 60, 90, 120, 144, 165, 240, 'variable']:
++                    result = page.evaluate('''({vehicle, fps}) => {
++                        const s = __hillClimb.scene.getScene('HillClimb');
++                        s.matter.world.autoUpdate = false;
++                        s.startRun(vehicle, 'countryside', 'sandbox');
++                        // Use a flat lane to isolate frame judder from actual bumps.
++                        s.hasStarted = false;
++                        const world = s.matter.world, camera = s.cameras.main;
++                        for (const body of [...world.localWorld.bodies])
++                            if (body.label === 'terrain') world.remove(body);
++                        for (const bridge of s.track.bridges) world.remove(bridge.constraints);
++                        s.matter.add.rectangle(10000, 660, 30000, 100,
++                            {isStatic:true, label:'terrain', friction:1});
++                        for(let i=0;i<90;i++) world.step(1000/60);
++                        s.keys.right.isDown = true;
++                        for(let i=0;i<240;i++) {
++                            world.step(1000/60); s.update(0,1000/60); camera.preRender();
++                        }
++                        world.autoUpdate = true;
++                        const frames = fps === 'variable' ? [8,9,7,11,6,18,5,24,8,16] : [1000/fps];
++                        world.runner.timeLastTick = 10000; world.runner.timeBuffer = 0;
++                        world.runner.frameDeltaHistory = []; world.runner.frameDelta = frames[0];
++                        let time=10000, elapsed=0, i=0, last=null, noTickFrames=0, movingFrames=0;
++                        let maxBack=0, baselineBack=0, maxNoTickBack=0, finite=true;
++                        while(elapsed<3000) {
++                            const dt=frames[i++%frames.length]; time+=dt; elapsed+=dt;
++                            s.sys.step(time,dt); camera.preRender();
++                            const v=s.vehicle, raw=v.body.position;
++                            const pose=s.motion.sample(v.body);
++                            finite &&= [pose.position.x,pose.position.y,pose.angle,camera.scrollX].every(Number.isFinite);
++                            const now={sprite:v.bodySprite.x, screen:v.bodySprite.x-camera.scrollX,
++                                rawScreen:raw.x-camera.scrollX,tick:world.engine.timing.timestamp};
++                            if(elapsed>1000 && last) {
++                                maxBack=Math.max(maxBack,last.screen-now.screen);
++                                baselineBack=Math.max(baselineBack,last.rawScreen-now.rawScreen);
++                                if(now.tick===last.tick) {
++                                    noTickFrames++;
++                                    if(now.sprite>last.sprite+.01) movingFrames++;
++                                    maxNoTickBack=Math.max(maxNoTickBack,last.screen-now.screen);
++                                }
++                            }
++                            last=now;
++                            if(Math.abs(v.bodySprite.x-pose.position.x)>1e-8) throw Error('Body render phase mismatch');
++                            for(let j=0;j<v.wheels.length;j++)
++                                if(Math.abs(v.wheelSprites[j].x-s.motion.sample(v.wheels[j]).position.x)>1e-8)
++                                    throw Error('Wheel render phase mismatch');
++                        }
++                        const before={x:s.vehicle.bodySprite.x,y:s.vehicle.bodySprite.y,c:camera.scrollX};
++                        s.hasStarted=true; s.pauseRun();
++                        for(let i=0;i<10;i++){time+=8;s.sys.step(time,8);camera.preRender();}
++                        const frozen=before.x===s.vehicle.bodySprite.x && before.y===s.vehicle.bodySprite.y
++                            && before.c===camera.scrollX;
++                        s.closeGarage(); time+=10000; s.sys.step(time,8); camera.preRender();
++                        const resumeJump=Math.abs(s.vehicle.bodySprite.x-before.x);
++                        s.startRun(vehicle,'countryside','sandbox');
++                        const reset=s.motion.sample(s.vehicle.body).position.x===260;
++                        return {fps,vehicle,finite,noTickFrames,movingFrames,maxBack,baselineBack,maxNoTickBack,frozen,reset,resumeJump};
++                    }''', {'vehicle': vehicle, 'fps': fps})
++                    result['viewport'] = width
++                    report.append(result)
++                    print(json.dumps(result), flush=True)
++                    assert result['finite'] and result['reset'], 'Invalid/stale render pose'
++                    assert result['frozen'], 'Paused render changes pose'
++                    assert result['resumeJump'] < 30, 'Long pause causes a catch-up teleport'
++                    assert result['maxBack'] < 1.5, 'Vehicle visibly snaps backward between frames'
++                    if isinstance(fps, int) and fps > 60:
++                        assert result['noTickFrames'] > 0, 'High-refresh path was not exercised'
++                        assert result['movingFrames'] == result['noTickFrames'], 'Vehicle freezes between physics ticks'
++                        assert result['baselineBack'] > 2, 'Fixture no longer reproduces original un-interpolated judder'
++                        assert result['maxNoTickBack'] < 0.5, 'No-physics frame produces backward judder'
++            assert not errors, errors
++            page.close()
++        (OUT / 'motion-report.json').write_text(json.dumps(report, indent=2))
++        browser.close()
++finally:
++    server.shutdown()
++print('Frame-level motion regressions passed.', flush=True)
+--- /dev/null
++++ b/docs/motion-fix.md
+@@ -0,0 +1,40 @@
++# Vehicle frame judder — 0.4.1
++
++## Reproduction
++
++At high display refresh rates, the 60 Hz Matter runner deliberately skips physics
++on some rendered frames. Previously the vehicle sprites were moved only inside
++`afterPhysics`, whereas the camera moved every render frame. In the desktop flat-lane
++120 Hz regression this made the vehicle move backwards on screen by about 6 pixels
++on each skipped tick, although its physical position never went backwards.
++
++## Fix
++
++`RenderMotion` snapshots solved body transforms before/after ticks and interpolates
++chassis, individual wheels, suspension endpoints, moving bridge planks and props
++on every rendered frame. The camera samples those same wheel transforms.
++
++The native Phaser 3.90 / Matter 0.20 runner leaves half a step in its accumulator:
++the interpolation phase is `clamp(timeBuffer / delta - 0.5, 0, 1)`. Camera damping
++uses `runner.frameDelta` too, avoiding another desynchronisation with Phaser's
++separately smoothed render delta at uneven frame rates. Unit tests and the real
++Phaser World.update browser test cover this version-specific timing contract.
++
++Physics bodies, collision detection, fuel timing, spring tuning, traction and
++vehicle balance are not interpolated or changed. This is rendering only, with
++one solved-step interval of visual latency, never extrapolation. Pause freezes
++the displayed pose; a new run/explicit reposition resets interpolation. Manual
++`world.step` debugging with `autoUpdate=false` retains exact unsmoothed poses.
++
++## Checks
++
++- `npm test`: camera, suspension, progression and render snapshots/phase/reset.
++- `python tests/smoke.py`: existing game, bridges, restarts and mobile input.
++- `python tests/motion_smoke.py`: the production bundle, real scene frame events,
++  30/60/90/120/144/165/240 Hz and uneven frame timing, car + monowheel, 1280x720
++  and 390x844 viewports. Also pause/resume, reset, body/wheel phase agreement.
++
++The frame-rate cases simulate frame timestamps in Chromium, not physical monitors.
++The flat-lane fixture isolates rendering artefacts from real suspension motion;
++it does not claim that every bump, crash or drop in frame rate is imperceptible.
++Reports are in the CI `game-browser-screenshots` artifact as `motion-report.json`.
