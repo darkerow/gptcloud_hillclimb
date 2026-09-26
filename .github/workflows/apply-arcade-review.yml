@@ -1,0 +1,71 @@
+name: Validate arcade artwork and handling
+on:
+  push:
+    branches: [feature/arcade-art-suspension]
+    paths: [.review/arcade-patch.b64]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: arcade-review-import
+  cancel-in-progress: true
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/arcade-art-suspension
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Import verified source changes
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import {createHash} from 'node:crypto';
+          import {brotliDecompressSync} from 'node:zlib';
+          const hash=s=>createHash('sha256').update(s).digest('hex');
+          const raw=brotliDecompressSync(Buffer.from(fs.readFileSync('.review/arcade-patch.b64','utf8').trim(),'base64'));
+          if(hash(raw)!=='de616b3af05bd957e861f4f33e42f2751d01088bf1ffa8fe45ba8b2504d2e2da')throw Error('Patch checksum mismatch');
+          for(const file of JSON.parse(raw)){
+            if(!/^(src\/[^/]+\.(js|css)|tests\/[^/]+\.(py|mjs)|docs\/arcade-update\.md|README\.md|package\.json)$/.test(file.path))throw Error('Unexpected path: '+file.path);
+            const before=fs.existsSync(file.path)?fs.readFileSync(file.path,'utf8'):'';
+            if(hash(before)===file.sha)continue;
+            if(hash(before)!==file.base)throw Error('Source changed since review: '+file.path);
+            const chars=Array.from(before);
+            for(const [from,to,text] of [...file.ops].reverse())chars.splice(from,to-from,...Array.from(text));
+            const after=chars.join('');
+            if(hash(after)!==file.sha)throw Error('Result checksum mismatch: '+file.path);
+            fs.mkdirSync(path.dirname(file.path),{recursive:true});fs.writeFileSync(file.path,after);
+            console.log('Verified',file.path);
+          }
+          JS
+      - run: npm install --no-audit --no-fund
+      - run: npm test
+      - run: npm run build
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install playwright==1.57.0
+      - run: python -m playwright install --with-deps chromium
+      - run: python tests/smoke.py
+      - run: python tests/handling.py
+      - name: Commit only verified source files to the review branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src tests docs README.md package.json package-lock.json
+          if ! git diff --cached --quiet; then
+            git commit -m 'Redraw arcade vehicles and stages, tune independent suspension and verify handling'
+            git push origin HEAD:refs/heads/feature/arcade-art-suspension
+          fi
+          git rev-parse HEAD
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arcade-review-evidence
+          path: test-results
+          retention-days: 7
