@@ -3,6 +3,7 @@ import "./style.css";
 import { createVehicle, destroyVehicle, drawVehicle, driveVehicle, getContacts } from "./vehicles.js";
 import { createInterface } from "./garage.js";
 import { readSetting, saveSetting, validVehicle, readBest } from "./storage.js";
+import { VehicleCameraRig } from "./camera.js";
 
 const WORLD_WIDTH = 22000;
 const TERRAIN_STEP = 90;
@@ -41,7 +42,7 @@ class HillClimbScene extends Phaser.Scene {
     this.input.keyboard.on("keydown-ESC", this.onEscape);
     this.matter.world.on("beforeupdate", this.physicsInput, this);
     this.matter.world.on("afterupdate", this.afterPhysics, this);
-    this.scale.on("resize", this.followVehicle, this);
+    this.scale.on("resize", this.resizeCamera, this);
     window.addEventListener("blur", this.onBlur);
     window.addEventListener("pagehide", this.onBlur);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.cleanup, this);
@@ -103,9 +104,11 @@ class HillClimbScene extends Phaser.Scene {
 
   followVehicle() {
     if (!this.vehicle) return;
-    this.cameras.main.startFollow(this.vehicle.body.position, true, 0.09, 0.09,
-      -Math.min(this.scale.width * 0.17, 180), this.vehicleType === "monowheel" ? 15 : 60);
+    this.cameraRig ??= new VehicleCameraRig(this.cameras.main);
+    this.cameraRig.track(this.vehicle, this.scale.width);
   }
+
+  resizeCamera() { this.cameraRig?.resize(this.scale.width); }
 
   clearInput() {
     this.ui?.clear();
@@ -161,6 +164,8 @@ class HillClimbScene extends Phaser.Scene {
 
   update(_, delta) {
     if (this.menuOpen || this.finished || !this.vehicle) return;
+    // One camera update per rendered frame, after physics has advanced.
+    this.cameraRig.update(delta);
     const body = this.vehicle.body;
     this.distance = Math.max(0, Math.floor((body.position.x - START_X) / 10));
     this.bestDistance = Math.max(this.bestDistance, this.distance);
@@ -185,7 +190,8 @@ class HillClimbScene extends Phaser.Scene {
     this.saveBest();
     window.removeEventListener("blur", this.onBlur);
     window.removeEventListener("pagehide", this.onBlur);
-    this.scale.off("resize", this.followVehicle, this);
+    this.scale.off("resize", this.resizeCamera, this);
+    this.cameraRig?.destroy();
     this.matter.world.off("beforeupdate", this.physicsInput, this);
     this.matter.world.off("afterupdate", this.afterPhysics, this);
     this.input.keyboard.off("keydown-R", this.onRestart);
