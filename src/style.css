@@ -1,21 +1,68 @@
-html,
-body,
-#game {
-  width: 100%;
-  height: 100%;
-  margin: 0;
+:root { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #24394b; font-synthesis: none; }
+* { box-sizing: border-box; }
+html, body, #game { width: 100%; height: 100%; margin: 0; }
+html, body { overflow: hidden; background: #9ed8ff; touch-action: none; user-select: none; -webkit-user-select: none; }
+canvas { display: block; }
+button { font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: none; }
+button:focus-visible { outline: 3px solid #ef782c; outline-offset: 4px; }
+[hidden] { display: none !important; }
+.game-interface { position: fixed; inset: 0; pointer-events: none; }
+.game-hud { position: absolute; inset: max(20px, env(safe-area-inset-top)) max(22px, env(safe-area-inset-right)) auto max(22px, env(safe-area-inset-left)); display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.score { display: flex; flex-direction: column; color: #fff; text-shadow: 0 2px 4px #24485688; }
+.score strong { font-size: 36px; line-height: 1; font-weight: 900; }
+.score span { font-size: 16px; font-weight: 700; margin-top: 8px; }
+.score small { font-size: 12px; font-weight: 750; letter-spacing: 1px; margin-top: 4px; }
+nav { display: flex; gap: 8px; }
+nav button { pointer-events: auto; border: 1px solid #fff9; border-radius: 12px; padding: 11px 15px; background: #fffc; color: #24394b; font-size: 14px; font-weight: 750; box-shadow: 0 3px 12px #24394b12; }
+kbd { font: inherit; font-size: 11px; border: 1px solid #24394b33; border-radius: 4px; padding: 1px 4px; margin-left: 6px; opacity: .6; }
+.run-status { position: absolute; top: 120px; width: 100%; text-align: center; font-weight: 750; padding: 0 16px; color: #23384b; }
+.pedals { position: absolute; left: max(22px, env(safe-area-inset-left)); right: max(22px, env(safe-area-inset-right)); bottom: max(20px, env(safe-area-inset-bottom)); display: flex; align-items: flex-end; justify-content: space-between; }
+.pedals button { pointer-events: auto; width: 106px; height: 88px; border-radius: 20px; border: 2px solid #ffffff80; background: #203548b8; color: #fff; font-size: 32px; font-weight: 850; box-shadow: 0 5px 0 #142b4666; }
+.pedals button:active { background: #f38536; transform: translateY(3px); box-shadow: 0 2px 0 #142b4666; }
+.pedals button span { display: block; margin-top: 4px; font-size: 11px; letter-spacing: 1.5px; }
+.pedals p { text-align: center; color: #fff; text-shadow: 0 1px 3px #24394b; font-size: 14px; line-height: 1.7; }
+.pedals p span { font-size: 12px; opacity: .8; }
+.garage-overlay { pointer-events: auto; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 20px; background: #bddfecaa; backdrop-filter: blur(8px); touch-action: pan-y; }
+.garage-panel { width: min(760px, 100%); max-height: 100%; overflow-y: auto; overscroll-behavior: contain; padding: 30px; border: 1px solid #ffffffc0; border-radius: 28px; background: #f9fcf7; box-shadow: 0 24px 90px #284d6230; touch-action: pan-y; }
+.garage-eyebrow { font-size: 11px; letter-spacing: 2px; font-weight: 850; color: #648371; }
+h1 { margin: 8px 0 4px; font-size: clamp(26px, 5vw, 38px); line-height: 1.15; letter-spacing: -1px; }
+.garage-subtitle { margin: 9px 0 23px; color: #71818b; font-size: 14px; }
+.vehicle-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+.vehicle-card { text-align: left; background: #edf3ed; color: #24394b; border: 2px solid transparent; border-radius: 19px; padding: 15px; display: flex; flex-direction: column; transition: border-color .15s, background .15s; touch-action: pan-y; }
+.vehicle-card:hover { border-color: #b2c8b1; }
+.vehicle-card[aria-pressed="true"] { border-color: #f4913b; background: #fff2df; }
+.card-top { display: flex; justify-content: space-between; font-size: 10px; font-weight: 850; letter-spacing: 1px; color: #7e9686; }
+.selected-mark { color: #b96826; visibility: hidden; }
+.vehicle-card[aria-pressed="true"] .selected-mark { visibility: visible; }
+.vehicle-card svg { display: block; width: 100%; height: 153px; margin: 5px 0 12px; }
+.vehicle-card strong { font-size: 22px; letter-spacing: -.6px; }
+.vehicle-description { font-size: 12px; line-height: 1.5; color: #71818b; margin: 6px 0 13px; }
+.vehicle-record { margin-top: auto; font-size: 11px; font-weight: 800; color: #667f6e; }
+.garage-note { font-size: 12px; color: #819084; text-align: center; margin: 18px 0; }
+.garage-actions { display: flex; gap: 12px; }
+.garage-actions button { border: 0; border-radius: 12px; min-height: 52px; padding: 13px 20px; font-weight: 800; }
+#start-run { background: #f58b36; color: #fff; flex: 1; display: flex; align-items: center; justify-content: space-between; }
+#start-run:hover { background: #e97c27; }
+#resume-run { background: #e8efea; color: #587062; font-size: 12px; }
+@media (max-width: 520px) {
+  .game-hud { left: 14px; right: 14px; top: max(16px, env(safe-area-inset-top)); }
+  .score strong { font-size: 29px; } .score span { font-size: 13px; }
+  nav button { font-size: 12px; padding: 10px 12px; } nav kbd, #restart span { display: none; }
+  .pedals { left: 14px; right: 14px; } .pedals button { width: 88px; height: 78px; }
+  .pedals p { display: none; } .garage-overlay { padding: 12px; }
+  .garage-panel { padding: 20px 15px; border-radius: 21px; }
+  .vehicle-cards { gap: 9px; } .vehicle-card { padding: 11px; border-radius: 14px; }
+  .vehicle-card svg { height: 126px; } .vehicle-card strong { font-size: 18px; }
+  .vehicle-description { font-size: 11px; } .card-top { font-size: 8px; letter-spacing: .3px; }
+  .garage-actions { flex-direction: column; gap: 8px; }
+  .garage-actions button { min-height: 46px; padding: 11px 15px; }
 }
-
-html,
-body {
-  overflow: hidden;
-  background: #9ed8ff;
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
-
-canvas {
-  display: block;
+@media (max-height: 540px) {
+  .garage-overlay { padding: 9px; } .garage-panel { padding: 16px 22px; }
+  h1 { font-size: 25px; margin: 4px 0 12px; }
+  .garage-subtitle, .vehicle-description, .garage-note { display: none; }
+  .vehicle-card { padding: 10px 14px; } .vehicle-card svg { height: 90px; margin: 0; }
+  .vehicle-card strong { font-size: 18px; } .vehicle-record { margin-top: 5px; }
+  .garage-actions { flex-direction: row; margin-top: 12px; } .garage-actions button { min-height: 43px; padding: 9px 16px; }
+  .pedals button { height: 72px; width: 88px; } .pedals p { display: none; }
 }
