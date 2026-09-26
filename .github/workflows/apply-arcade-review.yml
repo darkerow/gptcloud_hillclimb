@@ -2,7 +2,7 @@ name: Validate arcade artwork and handling
 on:
   push:
     branches: [feature/arcade-art-suspension]
-    paths: [.review/arcade-patch.b64]
+    paths: [.review/part-4.b64]
   workflow_dispatch:
 permissions:
   contents: write
@@ -28,7 +28,8 @@ jobs:
           import {createHash} from 'node:crypto';
           import {brotliDecompressSync} from 'node:zlib';
           const hash=s=>createHash('sha256').update(s).digest('hex');
-          const raw=brotliDecompressSync(Buffer.from(fs.readFileSync('.review/arcade-patch.b64','utf8').trim(),'base64'));
+          const encoded=Array.from({length:5},(_,i)=>fs.readFileSync(`.review/part-${i}.b64`,'utf8').trim()).join('');
+          const raw=brotliDecompressSync(Buffer.from(encoded,'base64'));
           if(hash(raw)!=='de616b3af05bd957e861f4f33e42f2751d01088bf1ffa8fe45ba8b2504d2e2da')throw Error('Patch checksum mismatch');
           for(const file of JSON.parse(raw)){
             if(!/^(src\/[^/]+\.(js|css)|tests\/[^/]+\.(py|mjs)|docs\/arcade-update\.md|README\.md|package\.json)$/.test(file.path))throw Error('Unexpected path: '+file.path);
