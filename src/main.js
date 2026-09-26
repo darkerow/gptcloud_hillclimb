@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import './style.css';
+import './arcade.css';
 import {VEHICLES,STAGES,vehicleById,stageById,tunedVehicle} from './catalog.js';
 import {Progress} from './progression.js';
 import {createVehicle,destroyVehicle,drawVehicle,driveVehicle,getContacts,headTouches} from './vehicles.js';
