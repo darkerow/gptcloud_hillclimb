@@ -100,7 +100,8 @@ with sync_playwright() as p:
     check(page.locator('#garage').is_visible(), 'V opens garage')
     page.keyboard.press('Escape')
     check(page.locator('#garage').is_hidden(), 'Escape resumes current run')
-    page.evaluate("localStorage.setItem('hillclimb-vehicle','invalid');localStorage.setItem('hillclimb-best-car','NaN')")
+    # Inject bad values after the previous page's pagehide save has finished.
+    page.add_init_script("localStorage.setItem('hillclimb-vehicle','invalid');localStorage.setItem('hillclimb-best-car','NaN')")
     page.reload(); page.wait_for_selector('[data-vehicle="car"]')
     check(page.locator('[data-vehicle="car"]').get_attribute('aria-pressed') == 'true', 'Invalid saved selection falls back to car')
     check(page.evaluate(f'{SCENE}.bestDistance') == 0, 'Invalid record falls back to zero')
