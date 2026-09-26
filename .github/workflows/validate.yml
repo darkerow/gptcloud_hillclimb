@@ -25,6 +25,7 @@ jobs:
       - run: python -m playwright install --with-deps chromium
       - run: python tests/smoke.py
       - run: python tests/camera_smoke.py
+      - run: python tests/bridges_smoke.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:

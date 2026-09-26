@@ -4,9 +4,9 @@ import { createVehicle, destroyVehicle, drawVehicle, driveVehicle, getContacts }
 import { createInterface } from "./garage.js";
 import { readSetting, saveSetting, validVehicle, readBest } from "./storage.js";
 import { VehicleCameraRig } from "./camera.js";
+import { createTrack, terrainHeight, drawBridges, resetBridges, destroyTrack } from "./bridges.js";
 
 const WORLD_WIDTH = 22000;
-const TERRAIN_STEP = 90;
 const START_X = 260;
 
 class HillClimbScene extends Phaser.Scene {
@@ -50,11 +50,7 @@ class HillClimbScene extends Phaser.Scene {
     this.openGarage();
   }
 
-  terrainY(x) {
-    const difficulty = Phaser.Math.Clamp((x - 5000) / 13000, 0, 1);
-    return 560 + Math.sin(x * 0.0024) * 82 + Math.sin(x * 0.0062 + 1.2) * 42
-      + Math.sin(x * 0.014 + 0.6) * 13 + Math.sin(x * 0.0105 + 2.1) * 60 * difficulty;
-  }
+  terrainY(x) { return terrainHeight(x); }
 
   createBackground() {
     this.cameras.main.setBackgroundColor("#9ed8ff");
@@ -74,32 +70,8 @@ class HillClimbScene extends Phaser.Scene {
   }
 
   createTerrain() {
-    const points = [];
-    for (let x = -500; x <= WORLD_WIDTH + 600; x += TERRAIN_STEP) points.push({ x, y: this.terrainY(x) });
-    const visual = this.add.graphics();
-    visual.fillStyle(0x6c9b49).lineStyle(7, 0x3f6f2b);
-    visual.beginPath(); visual.moveTo(points[0].x, 1800); visual.lineTo(points[0].x, points[0].y);
-    for (const p of points) visual.lineTo(p.x, p.y);
-    visual.lineTo(points.at(-1).x, 1800); visual.closePath(); visual.fillPath();
-    visual.beginPath(); visual.moveTo(points[0].x, points[0].y);
-    for (const p of points) visual.lineTo(p.x, p.y);
-    visual.strokePath();
-    for (let i = 0; i < points.length - 1; i++) {
-      const a = points[i], b = points[i + 1];
-      const angle = Math.atan2(b.y - a.y, b.x - a.x);
-      // Offset along the normal so the collider's top matches the drawn slope.
-      this.terrainBodies.push(this.matter.add.rectangle(
-        (a.x + b.x) / 2 - Math.sin(angle) * 35,
-        (a.y + b.y) / 2 + Math.cos(angle) * 35,
-        Math.hypot(b.x - a.x, b.y - a.y) + 4, 70,
-        { isStatic: true, angle, friction: 1, restitution: 0, label: "terrain" }
-      ));
-    }
-    for (let x = START_X + 1000; x < WORLD_WIDTH - 700; x += 1000) {
-      this.add.text(x, this.terrainY(x) - 52, `${Math.round((x - START_X) / 10)} м`, {
-        fontFamily: "Arial", fontStyle: "bold", fontSize: "22px", color: "#fff", stroke: "#2a4d21", strokeThickness: 5
-      }).setOrigin(0.5);
-    }
+    this.track = createTrack(this, WORLD_WIDTH, START_X);
+    this.terrainBodies = this.track.terrainBodies;
   }
 
   followVehicle() {
@@ -134,6 +106,7 @@ class HillClimbScene extends Phaser.Scene {
     this.saveBest(); this.clearInput();
     this.cameras.main.stopFollow();
     destroyVehicle(this, this.vehicle);
+    resetBridges(this.track);
     this.vehicleType = validVehicle(type);
     saveSetting("hillclimb-vehicle", this.vehicleType);
     this.bestDistance = readBest(this.vehicleType);
@@ -159,6 +132,7 @@ class HillClimbScene extends Phaser.Scene {
   afterPhysics() {
     if (!this.vehicle) return;
     this.contacts = getContacts(this, this.vehicle);
+    drawBridges(this.track);
     drawVehicle(this.vehicle);
   }
 
@@ -197,6 +171,7 @@ class HillClimbScene extends Phaser.Scene {
     this.input.keyboard.off("keydown-R", this.onRestart);
     this.input.keyboard.off("keydown-V", this.onGarage);
     this.input.keyboard.off("keydown-ESC", this.onEscape);
+    destroyTrack(this, this.track);
     this.ui.destroy();
   }
 }
